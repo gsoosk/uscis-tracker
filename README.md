@@ -2,7 +2,7 @@
 
 A privacy-first, single-page web application that parses and visualizes USCIS ELIS API JSON data — transforming raw case records into a rich, human-readable timeline with intelligent event interpretation, progress tracking, and comprehensive case analysis.
 
-> **100% client-side** — No servers, no databases, no data transmission. All processing happens entirely in your browser.
+> **100% client-side** — No servers, no databases, no data transmission. Snapshots you save are stored only in your own browser's local storage.
 
 ---
 
@@ -35,6 +35,13 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 ### 📬 Official Notices
 - Parsed display of all USCIS notices with generation dates
 - Interview appointment date/time extraction
+
+### 📌 Multi-Case Tracking & Snapshot History
+- Every analyzed case is **auto-saved locally** in your browser under its receipt number — nothing is sent anywhere
+- Track and switch between **multiple cases** from the Tracked Cases panel
+- Each save is a timestamped snapshot; **View Changes** shows a structural diff between any two snapshots for a case
+- Returning to the tracker reopens whichever case you last updated
+- Remove a single case or clear all saved data at any time, right from the panel
 
 ### 🌐 Timezone Support
 - **Default: Central Time (CT) — CST/CDT** — No location permission prompts
@@ -88,14 +95,18 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 Once loaded, the tracker will display:
 - **Stat Bar** — Quick overview metrics
 - **Case Details** — Two-card grid with application info and status flags
+- **Snapshot History** — Saved snapshots for this case, with a diff viewer between any two
 - **Official Notices** — If any notices exist in the data
 - **Event Timeline** — Full chronological history with decoded event codes
 - **Case Summary & Analysis** — Intelligent narrative with progress bar
+
+Analyzing a case also saves it locally under its receipt number — it appears in the **Tracked Cases** panel at the top, so you can come back and switch between cases anytime without re-pasting JSON.
 
 ### Step 4: Adjust Settings (Optional)
 
 - **Change Timezone** — Use the "Display Timezone" dropdown in the header
 - **Toggle Theme** — Click the 🌙/☀️ toggle button, or enable ⚡ AUTO mode
+- **Manage Saved Cases** — Remove a single case or clear everything from the Tracked Cases panel
 
 ---
 
@@ -155,9 +166,9 @@ The application includes a comprehensive dictionary of **60+ USCIS event codes**
 
 ## 🔒 Privacy & Security
 
-- ✅ **Zero data transmission** — No API calls, no analytics, no tracking
+- ✅ **Zero data transmission** — No API calls, no tracking of your case data
 - ✅ **No server-side processing** — Everything runs in the browser
-- ✅ **No data storage** — Nothing is saved to disk, cookies, or cloud
+- ✅ **Saved locally only** — Snapshots you save are stored in your browser's `localStorage` and never transmitted anywhere; clear a case or all data anytime from the Tracked Cases panel
 - ✅ **No external dependencies** — Only Google Fonts are loaded externally
 - ✅ **Open source** — Full source code visible and auditable
 
@@ -216,6 +227,13 @@ xdg-open index.html
 ---
 
 ## 📝 Changelog
+
+### v1.1 — September 2026
+- Multi-case tracking: analyzed cases are auto-saved locally under their receipt number
+- Tracked Cases panel to switch between saved cases without re-pasting JSON
+- Snapshot History with a structural diff viewer between any two saved snapshots
+- Returning visits reopen the most recently updated tracked case
+- Updated privacy copy to reflect local-storage persistence (still 100% local, never transmitted)
 
 ### v1.0 — April 2026
 - Initial release

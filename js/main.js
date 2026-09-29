@@ -100,6 +100,257 @@
     let currentData = null;
     let themeAuto = true;
 
+    // ─────────────────────────────────────────────────────────────
+    // TRACKED CASES — local persistence (browser-only, never transmitted)
+    // Each analyzed case is auto-saved under its receipt number, with a
+    // timestamped history of every distinct snapshot, so returning users
+    // can revisit prior cases and see what changed between saves.
+    // ─────────────────────────────────────────────────────────────
+    const CASES_KEY = 'uscis-tracker-cases';
+
+    function loadTrackedCases() {
+      try { return JSON.parse(localStorage.getItem(CASES_KEY) || '{}'); }
+      catch { return {}; }
+    }
+
+    function saveTrackedCases(cases) {
+      localStorage.setItem(CASES_KEY, JSON.stringify(cases));
+    }
+
+    // Structural diff between two case JSON objects. Ignores updatedAtTimestamp
+    // on its own (that alone doesn't make a snapshot meaningfully "changed" for
+    // history purposes — a real new event/notice/status change does).
+    function computeJsonDiff(oldData, newData) {
+      const ignoreFields = ['updatedAtTimestamp'];
+      const changes = [];
+
+      function compareValues(path, old, current) {
+        if (ignoreFields.includes(path)) return;
+
+        if (!old && current) { changes.push({ path, type: 'added', value: current }); return; }
+        if (old && !current) { changes.push({ path, type: 'removed', value: old }); return; }
+        if (!old && !current) return;
+
+        if (typeof old !== typeof current) {
+          changes.push({ path, type: 'changed', old, new: current });
+          return;
+        }
+
+        if (Array.isArray(old)) {
+          if (path === 'events') {
+            const oldIds = new Set(old.map(e => e.eventId));
+            current.forEach(e => {
+              if (!oldIds.has(e.eventId)) {
+                changes.push({ path: `events[${e.eventCode}]`, type: 'added', value: e });
+              }
+            });
+          } else if (path === 'notices') {
+            const oldIds = new Set(old.map(n => n.letterId));
+            current.forEach(n => {
+              if (!oldIds.has(n.letterId)) {
+                changes.push({ path: `notices[${n.actionType}]`, type: 'added', value: n });
+              }
+            });
+          }
+          return;
+        }
+
+        if (typeof old === 'object') {
+          Object.keys({ ...old, ...current }).forEach(key => {
+            compareValues(path ? `${path}.${key}` : key, old[key], current[key]);
+          });
+          return;
+        }
+
+        if (old !== current) {
+          changes.push({ path, type: 'changed', old, new: current });
+        }
+      }
+
+      compareValues('', oldData, newData);
+      return changes;
+    }
+
+    function hasJsonChanged(oldData, newData) {
+      return computeJsonDiff(oldData, newData).length > 0;
+    }
+
+    // Persist a newly analyzed case. Returns whether a new snapshot was
+    // actually written (skips duplicate saves when nothing changed).
+    function saveSnapshot(receiptNumber, formType, data) {
+      if (!receiptNumber) return { saved: false, isNewCase: false, total: 0 };
+
+      const cases = loadTrackedCases();
+      if (!cases[receiptNumber]) {
+        cases[receiptNumber] = { receiptNumber, formType, history: [] };
+      }
+
+      const hist = cases[receiptNumber].history;
+      const isNewCase = hist.length === 0;
+
+      if (!isNewCase && !hasJsonChanged(hist[hist.length - 1].data, data)) {
+        return { saved: false, isNewCase: false, total: hist.length };
+      }
+
+      hist.push({ at: new Date().toISOString(), data });
+      cases[receiptNumber].formType = formType;
+      saveTrackedCases(cases);
+      return { saved: true, isNewCase, total: hist.length };
+    }
+
+    function removeTrackedCase(receiptNumber) {
+      const cases = loadTrackedCases();
+      delete cases[receiptNumber];
+      saveTrackedCases(cases);
+    }
+
+    function mostRecentlyUpdatedReceipt(cases) {
+      let best = null;
+      Object.keys(cases).forEach(r => {
+        const hist = cases[r].history;
+        const t = new Date(hist[hist.length - 1].at);
+        if (!best || t > best.t) best = { r, t };
+      });
+      return best ? best.r : null;
+    }
+
+    // ── Tracked Cases panel ─────────────────────────────────────
+    function renderTrackedCasesBar() {
+      const cases = loadTrackedCases();
+      const panel = document.getElementById('trackedCasesPanel');
+      const list = document.getElementById('trackedCasesList');
+      const receiptNumbers = Object.keys(cases);
+
+      if (receiptNumbers.length === 0) { panel.style.display = 'none'; return; }
+      panel.style.display = 'block';
+
+      list.innerHTML = receiptNumbers.map(r => {
+        const c = cases[r];
+        const latest = c.history[c.history.length - 1].data;
+        const isActive = currentData && currentData.receiptNumber === r;
+        const isClosed = latest.closed === true;
+        const snapCount = c.history.length;
+        return `
+      <div class="tracked-case-chip ${isActive ? 'active' : ''}" onclick="loadTrackedCase('${r}')" title="Load ${r}">
+        <span class="tcc-dot ${isClosed ? 'closed' : 'open'}"></span>
+        <span class="tcc-receipt">${r}</span>
+        <span class="tcc-form">${latest.formType || ''}</span>
+        <span class="tcc-snaps">${snapCount} snap${snapCount !== 1 ? 's' : ''}</span>
+        <button class="tcc-remove" onclick="event.stopPropagation();removeTrackedCaseUI('${r}')" aria-label="Remove ${r}">✕</button>
+      </div>`;
+      }).join('');
+    }
+
+    function loadTrackedCase(receiptNumber) {
+      const cases = loadTrackedCases();
+      const c = cases[receiptNumber];
+      if (!c) return;
+
+      const latest = c.history[c.history.length - 1].data;
+      currentData = latest;
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('output').style.display = 'block';
+      renderAll(latest);
+      renderTrackedCasesBar();
+      window.scrollTo({ top: document.getElementById('statBar').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    function removeTrackedCaseUI(receiptNumber) {
+      if (!confirm(`Remove ${receiptNumber} and all its saved snapshots from this browser? This cannot be undone.`)) return;
+      removeTrackedCase(receiptNumber);
+      if (currentData && currentData.receiptNumber === receiptNumber) {
+        clearAll();
+      }
+      renderTrackedCasesBar();
+    }
+
+    function clearAllTrackedCases() {
+      if (!confirm('Remove ALL tracked cases and saved snapshots from this browser? This cannot be undone.')) return;
+      localStorage.removeItem(CASES_KEY);
+      clearAll();
+      renderTrackedCasesBar();
+    }
+
+    // ── Snapshot history (per currently displayed case) ─────────
+    function renderSnapshotHistory(receiptNumber) {
+      const section = document.getElementById('snapshotHistorySection');
+      const cases = loadTrackedCases();
+      const c = cases[receiptNumber];
+
+      if (!c || c.history.length < 2) { section.style.display = 'none'; return; }
+      section.style.display = 'block';
+
+      const hist = c.history;
+      const rows = hist.map((snap, i) => {
+        const prev = i > 0 ? hist[i - 1].data : null;
+        const changed = prev ? hasJsonChanged(prev, snap.data) : true;
+        const label = i === 0 ? 'First saved snapshot' : (changed ? 'Changed' : 'No change detected');
+        const badgeCls = i === 0 ? 'badge-blue' : (changed ? 'badge-gold' : 'badge-gray');
+        return `
+      <div class="snapshot-row">
+        <span class="snapshot-time">${fmtFullInTZ(snap.at, selectedTZ)}</span>
+        <span class="badge ${badgeCls}">${label}</span>
+        ${i > 0 ? `<button class="btn btn-ghost btn-xs" onclick="viewSnapshotDiff('${receiptNumber}', ${i})">View Changes</button>` : ''}
+      </div>`;
+      }).reverse().join('');
+
+      document.getElementById('snapshotHistoryCard').innerHTML = rows;
+    }
+
+    function formatDiffValue(value) {
+      if (typeof value === 'object' && value !== null) return JSON.stringify(value, null, 2);
+      return String(value);
+    }
+
+    function viewSnapshotDiff(receiptNumber, index) {
+      const cases = loadTrackedCases();
+      const hist = cases[receiptNumber].history;
+      const prevSnap = hist[index - 1];
+      const currSnap = hist[index];
+      const changes = computeJsonDiff(prevSnap.data, currSnap.data);
+
+      document.getElementById('diffModalTitle').textContent =
+        `Changes — ${fmtFullInTZ(prevSnap.at, selectedTZ)} → ${fmtFullInTZ(currSnap.at, selectedTZ)}`;
+
+      const body = document.getElementById('diffModalBody');
+      if (changes.length === 0) {
+        body.innerHTML = '<div class="diff-row">No structural changes detected between these snapshots.</div>';
+      } else {
+        body.innerHTML = changes.map(ch => {
+          const detail = ch.type === 'changed'
+            ? `From: ${formatDiffValue(ch.old)}\nTo: ${formatDiffValue(ch.new)}`
+            : formatDiffValue(ch.value);
+          return `
+        <div class="diff-row ${ch.type}">
+          <div class="diff-path">${ch.path || 'root'}</div>
+          <div class="diff-detail">${detail}</div>
+        </div>`;
+        }).join('');
+      }
+
+      document.getElementById('diffModalOverlay').classList.add('show');
+    }
+
+    function closeDiffModal() {
+      document.getElementById('diffModalOverlay').classList.remove('show');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('diffModalOverlay').classList.contains('show')) {
+        closeDiffModal();
+      }
+    });
+
+    // ── Save toast ───────────────────────────────────────────────
+    let saveToastTimer = null;
+    function showSaveToast(message) {
+      const toast = document.getElementById('saveToast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(saveToastTimer);
+      saveToastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
 
     // ─────────────────────────────────────────────────────────────
     // TIMEZONE UTILITIES  (use Intl API — DST-aware)
@@ -375,10 +626,30 @@
       }
 
       currentData = d;
+
+      // Save before rendering — renderAll() reads snapshot history from
+      // storage internally (for the Snapshot History section), so it must
+      // see this snapshot already persisted.
+      let saveResult = null;
+      if (d.receiptNumber) {
+        saveResult = saveSnapshot(d.receiptNumber, d.formType, d);
+      }
+
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('output').style.display = 'block';
       renderAll(d);
+      renderTrackedCasesBar();
       window.scrollTo({ top: document.getElementById('statBar').offsetTop - 20, behavior: 'smooth' });
+
+      if (saveResult) {
+        if (saveResult.saved) {
+          showSaveToast(saveResult.isNewCase
+            ? `✓ Now tracking ${d.receiptNumber} — saved locally`
+            : `✓ New snapshot saved for ${d.receiptNumber} (${saveResult.total} total)`);
+        } else if (saveResult.total > 0) {
+          showSaveToast(`No changes since the last saved snapshot for ${d.receiptNumber}`);
+        }
+      }
     }
 
     function renderAll(d) {
@@ -579,6 +850,9 @@
 
       // ── Summary ─────────────────────────────────────────────
       renderSummary(d, events, notices, codes, daysSub, tz);
+
+      // ── Snapshot history (locally saved for this receipt) ────
+      if (d.receiptNumber) renderSnapshotHistory(d.receiptNumber);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -837,4 +1111,11 @@
       setInterval(updateClock, 10000);
       // Re-check auto theme every 5 minutes (handles sunrise/sunset transitions)
       setInterval(() => { if (themeAuto) applyAutoTheme(); }, 5 * 60 * 1000);
+
+      // Restore tracked cases saved in this browser, and reopen whichever
+      // one was updated most recently so returning users land on their data.
+      renderTrackedCasesBar();
+      const cases = loadTrackedCases();
+      const mostRecent = mostRecentlyUpdatedReceipt(cases);
+      if (mostRecent) loadTrackedCase(mostRecent);
     });

@@ -91,11 +91,12 @@
     "keywords": "USCIS, I-485, green card, case tracker, immigration, ELIS API, NIEM v5.0",
     "inLanguage": "en-US",
     "isAccessibleForFree": true,
-    "privacyPolicy": "All data processing is local. No data is stored or transmitted.",
+    "privacyPolicy": "All data processing is local. Saved snapshots are stored only in your browser's local storage and are never transmitted.",
     "featureList": [
       "USCIS ELIS API JSON parser",
       "NIEM v5.0 event code dictionary (70+ codes)",
       "Full case event timeline",
+      "Multi-case tracking with local snapshot history",
       "Smart approval and denial detection",
       "Interview waived / direct approval logic",
       "Dynamic case narrative",
@@ -176,6 +177,15 @@
 
   <!-- ══ MAIN ════════════════════════════════════════════════════ -->
   <div class="main">
+
+    <!-- Tracked Cases (saved locally in this browser) -->
+    <div class="tracked-cases-panel" id="trackedCasesPanel" style="display:none">
+      <div class="tracked-cases-header">
+        <span class="sec-label">📌 Tracked Cases (saved in this browser)</span>
+        <button class="btn btn-ghost btn-xs" onclick="clearAllTrackedCases()">Clear All</button>
+      </div>
+      <div class="tracked-cases-list" id="trackedCasesList"></div>
+    </div>
 
     <!-- Input section -->
     <div class="input-section">
@@ -286,7 +296,7 @@
           </div>
           <p style="margin-top:8px;font-size:11px;color:var(--text-dim)">Note: You must be signed in to your USCIS
             account in the same browser session for the API link to work. The JSON data is fetched directly from USCIS
-            servers to your browser — this tool does not store or transmit any data.</p>
+            servers to your browser — analyzed snapshots are saved only in this browser's local storage and are never transmitted anywhere.</p>
         </div>
       </div>
     </div>
@@ -304,6 +314,16 @@
         <div class="section-divider-line"></div>
       </div>
       <div class="grid-2" id="caseDetailsGrid"></div>
+
+      <!-- Snapshot History (this receipt's saved local history) -->
+      <div id="snapshotHistorySection" style="display:none">
+        <div class="section-divider">
+          <div class="section-divider-line"></div>
+          <div class="section-divider-title">Snapshot History</div>
+          <div class="section-divider-line"></div>
+        </div>
+        <div class="card" style="margin-bottom:18px" id="snapshotHistoryCard"></div>
+      </div>
 
       <!-- Notices -->
       <div id="noticesSection" style="display:none">
@@ -360,9 +380,9 @@
           provide, sourced from the USCIS ELIS API. This tool performs no independent data retrieval, verification, or
           legal interpretation. Event code definitions are derived from publicly available NIEM schema documentation and
           are provided for general informational purposes only.</p>
-        <p><strong>No data is stored, transmitted, or retained.</strong> All processing occurs locally within your
-          browser session. Your case information and personal data remain entirely on your device and are never sent to
-          any server, database, or third party.</p>
+        <p><strong>No data is ever transmitted to a server, database, or third party.</strong> All processing happens
+          locally in your browser. If you choose to let the tracker save a case, that snapshot is stored only in your
+          browser's local storage — it stays on your device and can be removed at any time from the Tracked Cases panel.</p>
         <p>Immigration matters are complex, consequential, and highly individual. The information presented here does
           not constitute legal advice. The developers, contributors, and associated parties expressly disclaim all
           liability for any errors, omissions, misinterpretations, or outcomes arising from the use of this tool.
@@ -408,6 +428,20 @@
       </div>
     </div>
   </div>
+
+  <!-- ══ Diff modal (Snapshot History → View Changes) ═════════════ -->
+  <div class="modal-overlay" id="diffModalOverlay" onclick="if(event.target===this) closeDiffModal()">
+    <div class="modal-box">
+      <div class="modal-box-header">
+        <h3 id="diffModalTitle">Changes</h3>
+        <button class="modal-box-close" onclick="closeDiffModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-box-body" id="diffModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ══ Save toast ════════════════════════════════════════════════ -->
+  <div class="save-toast" id="saveToast"></div>
 
   <!-- ══ SCRIPT ══════════════════════════════════════════════════ -->
   <script src='js/main.js'></script>

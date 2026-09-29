@@ -1355,6 +1355,219 @@
       text-decoration: underline;
     }
 
+    /* ── Tracked Cases panel ──────────────────────────────── */
+    .tracked-cases-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+    }
+
+    .tracked-cases-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .tracked-cases-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .tracked-case-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all .18s ease;
+      font-size: 12.5px;
+    }
+
+    .tracked-case-chip:hover {
+      border-color: var(--gold);
+    }
+
+    .tracked-case-chip.active {
+      border-color: var(--gold);
+      background: var(--gold-glow);
+    }
+
+    .tcc-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .tcc-dot.open { background: var(--gold); }
+    .tcc-dot.closed { background: var(--green); }
+
+    .tcc-receipt {
+      font-family: 'DM Mono', monospace;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .tcc-form { color: var(--text-muted); }
+
+    .tcc-snaps {
+      color: var(--text-dim);
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .tcc-remove {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 0 0 0 4px;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .tcc-remove:hover { color: var(--red); }
+
+    /* ── Snapshot history ──────────────────────────────────── */
+    .snapshot-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .snapshot-row:last-child { border-bottom: none; }
+
+    .snapshot-time {
+      font-family: 'DM Mono', monospace;
+      color: var(--text-muted);
+      font-size: 12px;
+      flex: 1;
+    }
+
+    .btn-xs {
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+    }
+
+    /* ── Save toast ────────────────────────────────────────── */
+    .save-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      color: var(--text);
+      box-shadow: 0 8px 24px var(--shadow);
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease;
+      max-width: 320px;
+    }
+
+    .save-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Diff modal ────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(3px);
+      z-index: 300;
+      padding: 30px 16px;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.show { display: block; }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      max-width: 640px;
+      margin: 20px auto;
+      overflow: hidden;
+    }
+
+    .modal-box-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-box-header h3 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--text);
+    }
+
+    .modal-box-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-box-close:hover { color: var(--text); }
+
+    .modal-box-body {
+      padding: 18px 20px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .diff-row {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      border-left: 3px solid transparent;
+    }
+
+    .diff-row.added { background: var(--green-dim); border-color: var(--green); }
+    .diff-row.removed { background: var(--red-dim); border-color: var(--red); }
+    .diff-row.changed { background: var(--gold-dim); border-color: var(--gold); }
+
+    .diff-path {
+      font-family: 'DM Mono', monospace;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      font-size: 11.5px;
+    }
+
+    .diff-detail {
+      color: var(--text-muted);
+      font-size: 11.5px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     /* ── Responsive ──────────────────────────────────────── */
     @media(max-width:860px) {
 
