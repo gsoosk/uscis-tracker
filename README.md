@@ -113,7 +113,7 @@ Analyzing a case also saves it locally under its receipt number — it appears i
 ## 📂 Project Structure
 
 ```
-uscis-tracker.github.io/
+uscis-tracker/
 ├── css/
 │   └── style.css          <-- All design & layout
 ├── js/

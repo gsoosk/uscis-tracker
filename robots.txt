@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://uscis-tracker.github.io/sitemap.xml
+Sitemap: https://gsoosk.github.io/uscis-tracker/sitemap.xml
