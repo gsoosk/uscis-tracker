@@ -44,8 +44,8 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 - Remove a single case or clear all saved data at any time, right from the panel
 
 ### 🌐 Timezone Support
-- **Default: Central Time (CT) — CST/CDT** — No location permission prompts
-- Full US timezone support via dropdown selector:
+- **Defaults to your device's own timezone** — detected via the browser's `Intl` API, no location permission prompts
+- Full US timezone support via dropdown selector, plus your detected zone if it's outside that list:
   - Continental: Eastern, Central, Mountain, Pacific
   - Non-Continental: Alaska, Hawaii-Aleutian, Hawaii
   - Territories: Puerto Rico (Atlantic), Guam (Chamorro), American Samoa
@@ -230,8 +230,10 @@ xdg-open index.html
 
 ### v1.1 — September 2026
 - Multi-case tracking: analyzed cases are auto-saved locally under their receipt number
-- Tracked Cases panel to switch between saved cases without re-pasting JSON
+- Tracked Cases panel to switch between saved cases without re-pasting JSON, plus an "Open All API Tabs" shortcut
 - Snapshot History with a structural diff viewer between any two saved snapshots
+- Fixed silent case updates being lost once a newer snapshot was analyzed
+- Timezone now defaults to your device's own timezone instead of a fixed Central Time default
 - Returning visits reopen the most recently updated tracked case
 - Updated privacy copy to reflect local-storage persistence (still 100% local, never transmitted)
 

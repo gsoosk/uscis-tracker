@@ -543,11 +543,30 @@
     // TIMEZONE DETECTION & CHANGE
     // ─────────────────────────────────────────────────────────────
     function detectUserTZ() {
-      // Default to Central Time (CT) — CST/CDT
-      // No geolocation or device timezone detection; user can change via the dropdown
+      // Default to the device/browser's own timezone (no geolocation needed —
+      // Intl already knows this from OS settings). Falls back to Central Time
+      // if detection isn't available. The dropdown still lets the user
+      // override it at any time.
       const select = document.getElementById('tzSelect');
-      select.value = 'America/Chicago';
-      selectedTZ = 'America/Chicago';
+      let detected = 'America/Chicago';
+      try {
+        detected = Intl.DateTimeFormat().resolvedOptions().timeZone || detected;
+      } catch {
+        detected = 'America/Chicago';
+      }
+
+      // If the detected zone isn't one of the predefined options, add it so
+      // the dropdown can actually display and keep it selected.
+      const exists = Array.from(select.options).some(opt => opt.value === detected);
+      if (!exists) {
+        const opt = document.createElement('option');
+        opt.value = detected;
+        opt.textContent = `Detected: ${detected}`;
+        select.insertBefore(opt, select.firstChild);
+      }
+
+      select.value = detected;
+      selectedTZ = detected;
     }
 
     function onTZChange() {
