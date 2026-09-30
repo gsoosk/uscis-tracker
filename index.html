@@ -182,7 +182,10 @@
     <div class="tracked-cases-panel" id="trackedCasesPanel" style="display:none">
       <div class="tracked-cases-header">
         <span class="sec-label">📌 Tracked Cases (saved in this browser)</span>
-        <button class="btn btn-ghost btn-xs" onclick="clearAllTrackedCases()">Clear All</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-xs" onclick="openAllTrackedApiTabs()">↗ Open All API Tabs</button>
+          <button class="btn btn-ghost btn-xs" onclick="clearAllTrackedCases()">Clear All</button>
+        </div>
       </div>
       <div class="tracked-cases-list" id="trackedCasesList"></div>
     </div>

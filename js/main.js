@@ -271,6 +271,17 @@
       renderTrackedCasesBar();
     }
 
+    // Open the official USCIS case-status API for every tracked receipt
+    // number in a new tab, staggered so the browser doesn't block them
+    // as popups.
+    function openAllTrackedApiTabs() {
+      const receiptNumbers = Object.keys(loadTrackedCases());
+      if (receiptNumbers.length === 0) return;
+      receiptNumbers.forEach((r, i) => {
+        setTimeout(() => window.open(USCIS_API_BASE + r, '_blank', 'noopener,noreferrer'), i * 300);
+      });
+    }
+
     // ── Snapshot history (per currently displayed case) ─────────
     function renderSnapshotHistory(receiptNumber) {
       const section = document.getElementById('snapshotHistorySection');
