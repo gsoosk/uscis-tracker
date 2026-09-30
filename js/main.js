@@ -117,15 +117,15 @@
       localStorage.setItem(CASES_KEY, JSON.stringify(cases));
     }
 
-    // Structural diff between two case JSON objects. Ignores updatedAtTimestamp
-    // on its own (that alone doesn't make a snapshot meaningfully "changed" for
-    // history purposes — a real new event/notice/status change does).
+    // Structural diff between two case JSON objects. updatedAtTimestamp is
+    // deliberately NOT ignored: a change to that field alone, with nothing
+    // else different, is exactly what a "silent update" is — treating it as
+    // "no change" would mean that snapshot is never saved and the silent
+    // update is lost forever.
     function computeJsonDiff(oldData, newData) {
-      const ignoreFields = ['updatedAtTimestamp'];
       const changes = [];
 
       function compareValues(path, old, current) {
-        if (ignoreFields.includes(path)) return;
 
         if (!old && current) { changes.push({ path, type: 'added', value: current }); return; }
         if (old && !current) { changes.push({ path, type: 'removed', value: old }); return; }
@@ -212,6 +212,44 @@
         if (!best || t > best.t) best = { r, t };
       });
       return best ? best.r : null;
+    }
+
+    // A "silent update" (updatedAtTimestamp advancing with no new formal
+    // event code) is synthesized per-snapshot, not returned by the USCIS
+    // API itself. Recompute it for every saved snapshot of this receipt —
+    // not just the one currently loaded — so an earlier silent touch is
+    // never lost once a newer snapshot is analyzed.
+    function computeSilentUpdateMarkers(receiptNumber, fallbackData) {
+      const cases = loadTrackedCases();
+      const c = receiptNumber ? cases[receiptNumber] : null;
+      const snapshots = (c && c.history && c.history.length > 0)
+        ? c.history.map(h => h.data)
+        : [fallbackData];
+
+      const seen = new Set();
+      const markers = [];
+
+      snapshots.forEach(snap => {
+        const snapUpdTs = snap.updatedAtTimestamp || snap.updatedAt;
+        if (!snapUpdTs) return;
+
+        const updTime = new Date(snapUpdTs);
+        const snapEvents = snap.events || [];
+        const maxEvTime = snapEvents.reduce((m, ev) => {
+          const t = new Date(ev.eventTimestamp || ev.createdAtTimestamp);
+          return t > m ? t : m;
+        }, new Date(0));
+
+        if (updTime > maxEvTime) {
+          const key = updTime.toISOString();
+          if (!seen.has(key)) {
+            seen.add(key);
+            markers.push({ type: 'silent-update', sortTs: snapUpdTs, displayTs: snapUpdTs, code: 'SILENT-UPDATE' });
+          }
+        }
+      });
+
+      return markers;
     }
 
     // ── Tracked Cases panel ─────────────────────────────────────
@@ -772,22 +810,13 @@
         },
       ];
 
-      // Add silent update if updatedAt is strictly after the most recent event
-      if (updTs) {
-        const updTime = new Date(updTs);
-        const maxEvTime = events.reduce((m, ev) => {
-          const t = new Date(ev.eventTimestamp || ev.createdAtTimestamp);
-          return t > m ? t : m;
-        }, new Date(0));
-        if (updTime > maxEvTime) {
-          allItems.push({
-            type: 'silent-update',
-            sortTs: updTs,
-            displayTs: updTs,
-            code: 'SILENT-UPDATE',
-          });
-        }
-      }
+      // Add silent-update markers derived from the FULL saved snapshot
+      // history for this receipt, not just the currently loaded JSON.
+      // USCIS's API only ever reports the latest updatedAtTimestamp, so a
+      // silent touch from an earlier snapshot would otherwise disappear
+      // the moment a newer snapshot is analyzed — defeating the whole
+      // point of keeping snapshot history.
+      allItems.push(...computeSilentUpdateMarkers(d.receiptNumber, d));
 
       // Sort newest → oldest
       allItems.sort((a, b) => new Date(b.sortTs) - new Date(a.sortTs));
