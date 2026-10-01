@@ -311,12 +311,15 @@
 
     // Open the official USCIS case-status API for every tracked receipt
     // number in a new tab, staggered so the browser doesn't block them
-    // as popups.
+    // as popups. Deliberately keeps window.opener (no "noopener") and uses
+    // a per-receipt window name, so the Auto-Fetch bookmarklet can send
+    // each tab's JSON back here, and re-opening the same receipt reuses
+    // its tab instead of piling up duplicates.
     function openAllTrackedApiTabs() {
       const receiptNumbers = Object.keys(loadTrackedCases());
       if (receiptNumbers.length === 0) return;
       receiptNumbers.forEach((r, i) => {
-        setTimeout(() => window.open(USCIS_API_BASE + r, '_blank', 'noopener,noreferrer'), i * 300);
+        setTimeout(() => window.open(USCIS_API_BASE + r, 'uscisTrackerApiTab_' + r), i * 300);
       });
     }
 
@@ -1157,8 +1160,29 @@
       const raw = document.getElementById('qfReceiptInput').value.trim().toUpperCase();
       if (!raw) return;
       const url = USCIS_API_BASE + raw;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      // Keeps window.opener (no "noopener") so the Auto-Fetch bookmarklet,
+      // if used on this tab, can send its JSON back here automatically.
+      window.open(url, 'uscisTrackerApiTab_' + raw);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // AUTO-FETCH — bookmarklet relay
+    // A one-time-installed bookmarklet, run on an opened USCIS API tab,
+    // posts that page's raw JSON back here via postMessage. We only ever
+    // act on messages that genuinely originate from my.uscis.gov and
+    // match our expected shape.
+    // ─────────────────────────────────────────────────────────────
+    const USCIS_ORIGIN = 'https://my.uscis.gov';
+
+    window.addEventListener('message', (event) => {
+      if (event.origin !== USCIS_ORIGIN) return;
+      const msg = event.data;
+      if (!msg || msg.type !== 'USCIS_TRACKER_CASE_JSON' || typeof msg.payload !== 'string') return;
+
+      document.getElementById('jsonInput').value = msg.payload;
+      parseJSON();
+      showSaveToast('⚡ Auto-fetched via bookmarklet');
+    });
 
     // ─────────────────────────────────────────────────────────────
     // INITIALIZE

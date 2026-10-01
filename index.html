@@ -265,6 +265,24 @@
             domain is not possible. This step-by-step method is the fastest available path.
           </p>
         </div>
+
+        <div class="qf-autofetch">
+          <div class="qf-autofetch-title">⚡ Auto-Fetch (optional, one-time setup)</div>
+          <div class="qf-autofetch-body">
+            <p>Skip copy/paste entirely: drag this button to your bookmarks bar once.</p>
+            <a class="btn btn-primary qf-bookmarklet"
+               href="javascript:%28function%28%29%7B%20try%20%7B%20var%20text%20%3D%20document.body.innerText%20%7C%7C%20document.body.textContent%20%7C%7C%20%27%27%3B%20if%20%28%21text%20%7C%7C%20%21text.trim%28%29%29%20%7B%20alert%28%27No%20content%20found%20on%20this%20page%20to%20send.%27%29%3B%20return%3B%20%7D%20if%20%28%21window.opener%20%7C%7C%20window.opener.closed%29%20%7B%20if%20%28navigator.clipboard%20%26%26%20navigator.clipboard.writeText%29%20%7B%20navigator.clipboard.writeText%28text%29%3B%20alert%28%27No%20tracker%20tab%20found%20-%20copied%20the%20JSON%20to%20your%20clipboard%20instead.%20Paste%20it%20into%20the%20tracker.%27%29%3B%20%7D%20else%20%7B%20alert%28%27No%20tracker%20tab%20found.%20Please%20copy%20this%20page%20content%20manually.%27%29%3B%20%7D%20return%3B%20%7D%20window.opener.postMessage%28%7B%20type%3A%20%27USCIS_TRACKER_CASE_JSON%27%2C%20payload%3A%20text%20%7D%2C%20%27%2A%27%29%3B%20document.body.style.cssText%20%3D%20%27background%3A%230d1117%3Bcolor%3A%233fb950%3Bfont%3A600%2020px%20-apple-system%2Csans-serif%3Bdisplay%3Aflex%3Balign-items%3Acenter%3Bjustify-content%3Acenter%3Bheight%3A100vh%3Bmargin%3A0%3Btext-align%3Acenter%3Bpadding%3A20px%3Bbox-sizing%3Aborder-box%27%3B%20document.body.textContent%20%3D%20%27Sent%20to%20USCIS%20Case%20Tracker%20-%20this%20tab%20will%20close%20shortly.%27%3B%20setTimeout%28function%28%29%7B%20window.close%28%29%3B%20%7D%2C%201200%29%3B%20%7D%20catch%20%28e%29%20%7B%20alert%28%27Bookmarklet%20error%3A%20%27%20%2B%20e.message%29%3B%20%7D%20%7D%29%28%29%3B"
+               onclick="return false;"
+               title="Drag me to your bookmarks bar — don't click">
+              ⚡ Send to Tracker
+            </a>
+            <p class="qf-autofetch-steps">
+              Then: open the API tab as usual (Quick Fetch or Open All API Tabs) → once signed in and the JSON is
+              showing, click the <strong>Send to Tracker</strong> bookmarklet in <em>that</em> tab → it's sent back
+              here, analyzed, and saved automatically.
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- API Access Guide -->

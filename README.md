@@ -42,6 +42,13 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 - Each save is a timestamped snapshot; **View Changes** shows a structural diff between any two snapshots for a case
 - Returning to the tracker reopens whichever case you last updated
 - Remove a single case or clear all saved data at any time, right from the panel
+- "Open All API Tabs" reopens the USCIS API for every tracked case at once
+
+### ⚡ Auto-Fetch Bookmarklet (optional)
+- A one-time-installed bookmarklet eliminates manual copy/paste
+- After opening a USCIS API tab, click the bookmarklet there to send its JSON straight back to the tracker
+- The tracker only ever accepts this data if it genuinely originates from `my.uscis.gov` — verified via the browser's `postMessage` origin check
+- Falls back to copying the JSON to your clipboard if the tracker tab isn't available
 
 ### 🌐 Timezone Support
 - **Defaults to your device's own timezone** — detected via the browser's `Intl` API, no location permission prompts
@@ -234,6 +241,7 @@ xdg-open index.html
 - Snapshot History with a structural diff viewer between any two saved snapshots
 - Fixed silent case updates being lost once a newer snapshot was analyzed
 - Timezone now defaults to your device's own timezone instead of a fixed Central Time default
+- Auto-Fetch bookmarklet: send a USCIS API tab's JSON back to the tracker automatically, no copy/paste needed
 - Returning visits reopen the most recently updated tracked case
 - Updated privacy copy to reflect local-storage persistence (still 100% local, never transmitted)
 
