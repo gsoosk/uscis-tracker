@@ -252,12 +252,32 @@
       return markers;
     }
 
+    // Move the "Load Case Data" input section down to just above the
+    // Disclaimer once at least one case is tracked, so returning users see
+    // their tracked cases and results first. With nothing tracked yet, it
+    // stays at the top (right after the Tracked Cases panel, which is
+    // hidden anyway at that point) since there's nothing else to show.
+    function repositionLoadDataSection(hasCases) {
+      const inputSection = document.getElementById('inputSection');
+      const trackedPanel = document.getElementById('trackedCasesPanel');
+      const disclaimerDivider = document.getElementById('disclaimerDivider');
+      if (!inputSection || !trackedPanel || !disclaimerDivider) return;
+
+      if (hasCases) {
+        disclaimerDivider.parentNode.insertBefore(inputSection, disclaimerDivider);
+      } else {
+        trackedPanel.parentNode.insertBefore(inputSection, trackedPanel.nextSibling);
+      }
+    }
+
     // ── Tracked Cases panel ─────────────────────────────────────
     function renderTrackedCasesBar() {
       const cases = loadTrackedCases();
       const panel = document.getElementById('trackedCasesPanel');
       const list = document.getElementById('trackedCasesList');
       const receiptNumbers = Object.keys(cases);
+
+      repositionLoadDataSection(receiptNumbers.length > 0);
 
       if (receiptNumbers.length === 0) { panel.style.display = 'none'; return; }
       panel.style.display = 'block';
