@@ -94,6 +94,69 @@
     };
 
     // ─────────────────────────────────────────────────────────────
+    // JURISDICTION DICTIONARY
+    // The case_status endpoint reports which USCIS office currently holds
+    // the case. Service centers adjudicate on paper; a field office holding
+    // the case usually means a local interview is in that office's queue.
+    // The API already sends jurisdictionDescription, so this map only adds
+    // a friendlier label and the center/office distinction where known.
+    // ─────────────────────────────────────────────────────────────
+    const JURISDICTIONS = {
+      NBC: { name: 'National Benefits Center', kind: 'center' },
+      TSC: { name: 'Texas Service Center', kind: 'center' },
+      NSC: { name: 'Nebraska Service Center', kind: 'center' },
+      VSC: { name: 'Vermont Service Center', kind: 'center' },
+      CSC: { name: 'California Service Center', kind: 'center' },
+      PSC: { name: 'Potomac Service Center', kind: 'center' },
+      YSC: { name: 'Potomac Service Center', kind: 'center' },
+      MSC: { name: 'National Benefits Center', kind: 'center' },
+      EAC: { name: 'Vermont Service Center', kind: 'center' },
+      WAC: { name: 'California Service Center', kind: 'center' },
+      LIN: { name: 'Nebraska Service Center', kind: 'center' },
+      SRC: { name: 'Texas Service Center', kind: 'center' },
+      NFB: { name: 'National Files Branch', kind: 'other' },
+      IOE: { name: 'ELIS Electronic Processing', kind: 'other' },
+    };
+
+    const JURIS_KIND_LABEL = {
+      center: { cls: 'badge-blue', txt: 'Service Center' },
+      office: { cls: 'badge-gold', txt: 'Field Office' },
+      other: { cls: 'badge-gray', txt: 'USCIS Office' },
+    };
+
+    // Escape untrusted API strings before they go through innerHTML.
+    function esc(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // "NATIONAL BENEFITS CENTER" → "National Benefits Center", while leaving
+    // two-letter state codes alone: "CHICAGO IL" → "Chicago IL", not "Chicago Il".
+    const TITLE_LOWER_WORDS = new Set(['of', 'in', 'at', 'on', 'to', 'by', 'or', 'as', 'and', 'the', 'for']);
+
+    function titleCase(str) {
+      return String(str || '').trim().split(/\s+/).filter(Boolean).map((word, i) => {
+        const lower = word.toLowerCase();
+        if (i > 0 && TITLE_LOWER_WORDS.has(lower)) return lower;
+        if (/^[A-Za-z]{2}$/.test(word)) return word.toUpperCase();
+        return lower.replace(/^[a-z]/, ch => ch.toUpperCase());
+      }).join(' ');
+    }
+
+    // Resolve a jurisdiction code + API description into display fields.
+    function getJurisdictionInfo(code, description) {
+      const key = String(code || '').toUpperCase();
+      const known = JURISDICTIONS[key];
+      const name = titleCase(description) || (known ? known.name : '');
+      // An unlisted 3-letter code the API describes as a city/state is a
+      // field office; anything else stays generic rather than guessing.
+      let kind = known ? known.kind : null;
+      if (!kind && name && !/center|branch|service/i.test(name)) kind = 'office';
+      return { code: key, name, kind };
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // STATE
     // ─────────────────────────────────────────────────────────────
     let selectedTZ = 'America/Chicago'; // default: Central Time (CT) — CST/CDT
@@ -115,6 +178,68 @@
 
     function saveTrackedCases(cases) {
       localStorage.setItem(CASES_KEY, JSON.stringify(cases));
+    }
+
+    // ── Jurisdiction side-store ─────────────────────────────────
+    // Jurisdiction comes from a second endpoint (case_status), so it can
+    // arrive before or after the main case JSON. This separate key holds
+    // the last known jurisdiction per receipt and is purely additive — it
+    // never touches CASES_KEY, so existing saved snapshots are untouched.
+    const JURIS_KEY = 'uscis-tracker-jurisdiction';
+
+    function loadJurisdictionStore() {
+      try { return JSON.parse(localStorage.getItem(JURIS_KEY) || '{}'); }
+      catch { return {}; }
+    }
+
+    function saveJurisdictionStore(store) {
+      localStorage.setItem(JURIS_KEY, JSON.stringify(store));
+    }
+
+    // Pull the jurisdiction pair out of either payload shape, or null.
+    function extractJurisdiction(d) {
+      if (!d || !d.jurisdiction) return null;
+      return {
+        jurisdiction: d.jurisdiction,
+        jurisdictionDescription: d.jurisdictionDescription || '',
+      };
+    }
+
+    function rememberJurisdiction(receiptNumber, juris) {
+      if (!receiptNumber || !juris) return;
+      const store = loadJurisdictionStore();
+      store[receiptNumber] = Object.assign({}, juris, { at: new Date().toISOString() });
+      saveJurisdictionStore(store);
+    }
+
+    // Last jurisdiction we have for this receipt: the side-store first,
+    // then the newest saved snapshot that carried one.
+    function lastKnownJurisdiction(receiptNumber) {
+      if (!receiptNumber) return null;
+      const stored = loadJurisdictionStore()[receiptNumber];
+      if (stored && stored.jurisdiction) return extractJurisdiction(stored);
+
+      const c = loadTrackedCases()[receiptNumber];
+      const hist = (c && c.history) || [];
+      for (let i = hist.length - 1; i >= 0; i--) {
+        const found = extractJurisdiction(hist[i].data);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    // Carry jurisdiction onto a freshly pasted case payload. The cases
+    // endpoint never reports it, so without this every refresh would look
+    // like the jurisdiction had been removed and churn a new snapshot.
+    function applyKnownJurisdiction(d) {
+      const own = extractJurisdiction(d);
+      if (own) {
+        rememberJurisdiction(d.receiptNumber, own);
+        return d;
+      }
+      const known = lastKnownJurisdiction(d.receiptNumber);
+      if (!known) return d;
+      return Object.assign({}, d, known);
     }
 
     // Structural diff between two case JSON objects. updatedAtTimestamp is
@@ -202,6 +327,10 @@
       const cases = loadTrackedCases();
       delete cases[receiptNumber];
       saveTrackedCases(cases);
+
+      const juris = loadJurisdictionStore();
+      delete juris[receiptNumber];
+      saveJurisdictionStore(juris);
     }
 
     function mostRecentlyUpdatedReceipt(cases) {
@@ -325,6 +454,7 @@
     function clearAllTrackedCases() {
       if (!confirm('Remove ALL tracked cases and saved snapshots from this browser? This cannot be undone.')) return;
       localStorage.removeItem(CASES_KEY);
+      localStorage.removeItem(JURIS_KEY);
       clearAll();
       renderTrackedCasesBar();
     }
@@ -710,12 +840,21 @@
       try { parsed = JSON.parse(raw); }
       catch (e) { showErr('Invalid JSON — ' + e.message); return; }
 
-      const d = parsed.data || parsed;
-      if (!d.receiptNumber && !d.formType && !d.events) {
+      const raw0 = parsed.data || parsed;
+      if (!raw0.receiptNumber && !raw0.formType && !raw0.events) {
         showErr('This does not appear to be a USCIS API JSON. Expected fields like "receiptNumber", "formType", or "events".');
         return;
       }
 
+      // The case_status endpoint returns a jurisdiction-bearing payload with
+      // no events array. Treat it as a jurisdiction update for a case we
+      // already track rather than as a replacement case record.
+      if (!raw0.events && (raw0.jurisdiction || raw0.statusTitle || raw0.historicalCaseStatuses)) {
+        applyStatusPayload(raw0);
+        return;
+      }
+
+      const d = applyKnownJurisdiction(raw0);
       currentData = d;
 
       // Save before rendering — renderAll() reads snapshot history from
@@ -741,6 +880,48 @@
           showSaveToast(`No changes since the last saved snapshot for ${d.receiptNumber}`);
         }
       }
+    }
+
+    // Handle a case_status payload: record the jurisdiction and fold it into
+    // the case we already track. Existing snapshots are never rewritten — a
+    // real jurisdiction change appends a new snapshot so the transfer shows
+    // up in Snapshot History like any other change.
+    function applyStatusPayload(s) {
+      const receipt = s.receiptNumber;
+      const juris = extractJurisdiction(s);
+
+      if (!receipt) {
+        showErr('This case_status JSON has no receipt number, so it cannot be matched to a case.');
+        return;
+      }
+      if (!juris) {
+        showErr(`No jurisdiction field found in this case_status JSON for ${receipt}.`);
+        return;
+      }
+
+      rememberJurisdiction(receipt, juris);
+
+      const cases = loadTrackedCases();
+      const c = cases[receipt];
+      if (!c || !c.history || c.history.length === 0) {
+        showSaveToast(`✓ Jurisdiction saved for ${receipt} — now load that case's full JSON`);
+        return;
+      }
+
+      const latest = c.history[c.history.length - 1].data;
+      const merged = Object.assign({}, latest, juris);
+      const saveResult = saveSnapshot(receipt, merged.formType, merged);
+
+      currentData = merged;
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('output').style.display = 'block';
+      renderAll(merged);
+      renderTrackedCasesBar();
+
+      const label = getJurisdictionInfo(juris.jurisdiction, juris.jurisdictionDescription).name || juris.jurisdiction;
+      showSaveToast(saveResult.saved
+        ? `✓ Jurisdiction updated — ${label}`
+        : `Jurisdiction unchanged — ${label}`);
     }
 
     function renderAll(d) {
@@ -789,6 +970,21 @@
       const actionBadge = d.actionRequired ? badge('badge-red', '', 'Action Required!') : badge('badge-green', '', 'No Action Needed');
       const rfeBadge = (d.evidenceRequests || []).length > 0 ? badge('badge-red', '', 'Evidence Requested') : badge('badge-green', '', 'None Pending');
 
+      // ── Jurisdiction (from the case_status endpoint) ─────────
+      const juris = getJurisdictionInfo(d.jurisdiction, d.jurisdictionDescription);
+      // When jurisdiction hasn't been fetched yet, point straight at the
+      // endpoint that reports it for this receipt. Keeps window.opener so
+      // the Auto-Fetch bookmarklet works on that tab too.
+      const jurisCodeHTML = juris.code
+        ? `<span class="mono" style="color:var(--gold)">${esc(juris.code)}</span>`
+        : (d.receiptNumber
+          ? `<a href="${USCIS_STATUS_API_BASE}${encodeURIComponent(d.receiptNumber)}" target="uscisTrackerStatusTab_${esc(d.receiptNumber)}" style="color:var(--blue)" title="Open the case_status endpoint for this receipt, then paste the JSON above (or click the Send to Tracker bookmarklet)">Fetch jurisdiction →</a>`
+          : '<span title="Load this case\'s case_status JSON to fill this in">Not fetched yet</span>');
+      const jurisKind = juris.kind ? JURIS_KIND_LABEL[juris.kind] : null;
+      const jurisOfficeHTML = juris.name
+        ? `${esc(juris.name)}${jurisKind ? ' ' + badge(jurisKind.cls, '', jurisKind.txt) : ''}`
+        : '—';
+
       document.getElementById('caseDetailsGrid').innerHTML = `
     <div class="card">
       <div class="card-title"><span class="card-title-icon" style="background:var(--gold-dim)">📋</span>Application Information</div>
@@ -799,6 +995,8 @@
       <div class="detail-row"><span class="detail-key">Filed</span><span class="detail-val mono" style="font-size:12px">${fmtFullInTZ(subTs, 'UTC')}</span></div>
       <div class="detail-row"><span class="detail-key">Last Updated</span><span class="detail-val mono" style="font-size:12px">${f(updTs)}</span></div>
       <div class="detail-row"><span class="detail-key">Filing Channel</span><span class="detail-val">${d.elisChannelType || '—'}</span></div>
+      <div class="detail-row" title="The USCIS office that currently holds this case, reported by the case_status endpoint"><span class="detail-key">Jurisdiction</span><span class="detail-val">${jurisCodeHTML}</span></div>
+      <div class="detail-row"><span class="detail-key">Jurisdiction Office</span><span class="detail-val" style="font-size:12px">${jurisOfficeHTML}</span></div>
     </div>
     <div class="card">
       <div class="card-title"><span class="card-title-icon" style="background:var(--green-dim)">✅</span>Case Flags &amp; Status</div>
@@ -1154,6 +1352,8 @@
     // QUICK FETCH — Receipt number → USCIS API URL opener
     // ─────────────────────────────────────────────────────────────
     const USCIS_API_BASE = 'https://my.uscis.gov/account/case-service/api/cases/';
+    // Second endpoint — reports the office currently holding the case.
+    const USCIS_STATUS_API_BASE = 'https://my.uscis.gov/account/case-service/api/case_status/';
 
     function onQFInput() {
       const raw = document.getElementById('qfReceiptInput').value.trim().toUpperCase();
@@ -1199,9 +1399,30 @@
       const msg = event.data;
       if (!msg || msg.type !== 'USCIS_TRACKER_CASE_JSON' || typeof msg.payload !== 'string') return;
 
+      // Newer bookmarklets also fetch the case_status endpoint and attach it
+      // here. Record that jurisdiction first so the case render below already
+      // shows it. Older bookmarklets omit the field and still work.
+      let jurisLabel = '';
+      if (typeof msg.jurisdictionPayload === 'string' && msg.jurisdictionPayload.trim()) {
+        try {
+          const st = JSON.parse(msg.jurisdictionPayload);
+          const sd = st.data || st;
+          const juris = extractJurisdiction(sd);
+          if (sd.receiptNumber && juris) {
+            rememberJurisdiction(sd.receiptNumber, juris);
+            jurisLabel = getJurisdictionInfo(juris.jurisdiction, juris.jurisdictionDescription).name
+              || juris.jurisdiction;
+          }
+        } catch (e) {
+          // A failed jurisdiction fetch must never block the main case data.
+        }
+      }
+
       document.getElementById('jsonInput').value = msg.payload;
       parseJSON();
-      showSaveToast('⚡ Auto-fetched via bookmarklet');
+      showSaveToast(jurisLabel
+        ? `⚡ Auto-fetched via bookmarklet — ${jurisLabel}`
+        : '⚡ Auto-fetched via bookmarklet');
     });
 
     // ─────────────────────────────────────────────────────────────

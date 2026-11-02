@@ -14,7 +14,7 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 - Supports the full USCIS ELIS API response structure
 
 ### 📋 Case Details Dashboard
-- **Application Information** — Receipt number, form type, form name, applicant name, filing date, last updated, filing channel
+- **Application Information** — Receipt number, form type, form name, applicant name, filing date, last updated, filing channel, and **jurisdiction** (the USCIS office currently holding the case, labelled as a service center or field office)
 - **Case Flags & Status** — Real-time badges for case status (open/closed), adjudicator acknowledgment, premium processing, group status, travel authorization, action required, and evidence requests
 
 ### 📅 Event Timeline
@@ -47,6 +47,7 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 ### ⚡ Auto-Fetch Bookmarklet (optional)
 - A one-time-installed bookmarklet eliminates manual copy/paste
 - After opening a USCIS API tab, click the bookmarklet there to send its JSON straight back to the tracker
+- It also pulls your case's **jurisdiction** from the `case_status` endpoint on that same page, so both arrive in one click
 - The tracker only ever accepts this data if it genuinely originates from `my.uscis.gov` — verified via the browser's `postMessage` origin check
 - Falls back to copying the JSON to your clipboard if the tracker tab isn't available
 
@@ -83,6 +84,11 @@ A privacy-first, single-page web application that parses and visualizes USCIS EL
 3. Replace `IOE09XXXXXXXX` with your unique application **receipt number**
 
 4. The browser will display the raw JSON response
+
+5. *Optional — jurisdiction.* The URL above does not report which USCIS office holds your case. To add it, visit the second endpoint below and paste that JSON the same way. It merges into the case you already analyzed and is remembered for later refreshes:
+   ```
+   https://my.uscis.gov/account/case-service/api/case_status/IOE09XXXXXXXX
+   ```
 
 ### Step 2: Load Data into the Tracker
 
@@ -234,6 +240,14 @@ xdg-open index.html
 ---
 
 ## 📝 Changelog
+
+### v1.2 — November 2026
+- Jurisdiction tracking: shows which USCIS office currently holds the case, read from the `case_status` endpoint
+- Service center vs. field office labelling, since a field office holding the case usually means a local interview queue
+- A jurisdiction transfer is saved as a new snapshot and appears in the Snapshot History diff
+- The Auto-Fetch bookmarklet now retrieves case data and jurisdiction in a single click (re-drag the button to update an older copy)
+- Jurisdiction is remembered per receipt, so it survives plain case-data refreshes
+- All previously saved cases and snapshots are preserved — this release only adds data, never rewrites or removes it
 
 ### v1.1 — September 2026
 - Multi-case tracking: analyzed cases are auto-saved locally under their receipt number
