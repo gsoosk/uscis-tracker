@@ -228,6 +228,30 @@
       return null;
     }
 
+    // "3 days ago" style age for the last jurisdiction check, so a stale
+    // value is obvious without adding another row to the card.
+    function jurisdictionCheckedAge(receiptNumber) {
+      const stored = loadJurisdictionStore()[receiptNumber];
+      if (!stored || !stored.at) return '';
+      const days = Math.floor((Date.now() - new Date(stored.at)) / 86400000);
+      if (!isFinite(days) || days < 0) return '';
+      if (days === 0) return 'checked today';
+      if (days === 1) return 'checked yesterday';
+      return `checked ${days} days ago`;
+    }
+
+    // Link to this receipt's case_status endpoint. Rendered whether or not a
+    // jurisdiction is already known, so a transfer can always be picked up.
+    function jurisdictionLinkHTML(receiptNumber, haveCode) {
+      if (!receiptNumber) return '';
+      const tabName = 'uscisTrackerStatusTab_' + String(receiptNumber).replace(/[^A-Za-z0-9]/g, '');
+      const age = haveCode ? jurisdictionCheckedAge(receiptNumber) : '';
+      const title = (haveCode ? 'Re-check which office holds this case' : 'Fetch which office holds this case')
+        + '. Opens the case_status endpoint — then click the Send to Tracker bookmarklet, or copy the JSON and paste it above.'
+        + (age ? ` (Last ${age}.)` : '');
+      return `<a href="${USCIS_STATUS_API_BASE}${encodeURIComponent(receiptNumber)}" target="${esc(tabName)}" style="color:var(--blue)" title="${esc(title)}">${haveCode ? 'Refresh' : 'Fetch jurisdiction'} →</a>`;
+    }
+
     // Carry jurisdiction onto a freshly pasted case payload. The cases
     // endpoint never reports it, so without this every refresh would look
     // like the jurisdiction had been removed and churn a new snapshot.
@@ -972,14 +996,14 @@
 
       // ── Jurisdiction (from the case_status endpoint) ─────────
       const juris = getJurisdictionInfo(d.jurisdiction, d.jurisdictionDescription);
-      // When jurisdiction hasn't been fetched yet, point straight at the
-      // endpoint that reports it for this receipt. Keeps window.opener so
-      // the Auto-Fetch bookmarklet works on that tab too.
+      // Jurisdiction lives behind a second endpoint, and a case can be
+      // transferred between offices at any time, so the link to re-check it
+      // stays available once a value is known — not only while it's empty.
+      // Keeps window.opener so the Auto-Fetch bookmarklet works on that tab.
+      const jurisLink = jurisdictionLinkHTML(d.receiptNumber, juris.code);
       const jurisCodeHTML = juris.code
-        ? `<span class="mono" style="color:var(--gold)">${esc(juris.code)}</span>`
-        : (d.receiptNumber
-          ? `<a href="${USCIS_STATUS_API_BASE}${encodeURIComponent(d.receiptNumber)}" target="uscisTrackerStatusTab_${esc(d.receiptNumber)}" style="color:var(--blue)" title="Open the case_status endpoint for this receipt, then paste the JSON above (or click the Send to Tracker bookmarklet)">Fetch jurisdiction →</a>`
-          : '<span title="Load this case\'s case_status JSON to fill this in">Not fetched yet</span>');
+        ? `<span class="mono" style="color:var(--gold)">${esc(juris.code)}</span>${jurisLink ? ` <span style="color:var(--text-dim)">·</span> ${jurisLink}` : ''}`
+        : (jurisLink || '<span title="Load this case\'s case_status JSON to fill this in">Not fetched yet</span>');
       const jurisKind = juris.kind ? JURIS_KIND_LABEL[juris.kind] : null;
       const jurisOfficeHTML = juris.name
         ? `${esc(juris.name)}${jurisKind ? ' ' + badge(jurisKind.cls, '', jurisKind.txt) : ''}`
